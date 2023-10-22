@@ -82,7 +82,15 @@ async fn main() {
             panic!("{:?}", error)
         }
     };
-    let _ = video.download(&video_info, selected_quality_index).await;
+    match video.download(&video_info, selected_quality_index).await {
+        Ok((video_file_path, audio_file_path)) => {
+            video.merge_video_and_audio(video_file_path, audio_file_path, video_info.title);
+        },
+        Err(error) => {
+            logger.fatal("下载视频音频失败");
+            panic!("{:?}", error) 
+        }
+    }
 }
 
 #[cfg(test)]

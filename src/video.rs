@@ -1,6 +1,10 @@
-use std::{time::SystemTime, fs::File, io::Write};
+use std::{fs::File, io::Write, process::Command, time::SystemTime};
 
-use crate::{crawler::Crawler, logger::Logger, video_info::{RawVideoInfo, VideoInfo, VideoParseError}};
+use crate::{
+    crawler::Crawler,
+    logger::Logger,
+    video_info::{RawVideoInfo, VideoInfo, VideoParseError},
+};
 use scraper::{Html, Selector};
 
 pub struct Video<'a> {
@@ -51,7 +55,10 @@ impl<'a> Video<'a> {
                 return Ok(script[prefix.len()..].to_owned());
             }
         }
-        return Err(VideoParseError::new(format!("can't find video json from '{}'", self.url)));
+        return Err(VideoParseError::new(format!(
+            "can't find video json from '{}'",
+            self.url
+        )));
     }
 
     pub async fn get_video_info(&self) -> Result<VideoInfo, Box<dyn std::error::Error>> {
@@ -63,24 +70,66 @@ impl<'a> Video<'a> {
         let video_json_str = self.extract_video_json(&document)?;
         let raw_video_info: RawVideoInfo = serde_json::from_str(&video_json_str)?;
         let video_info = VideoInfo::new(title, raw_video_info)?;
-        return Ok(video_info)
+        return Ok(video_info);
     }
 
-    pub async fn download(&self, video_info: &VideoInfo, selected_quality_index: usize) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn download(
+        &self,
+        video_info: &VideoInfo,
+        selected_quality_index: usize,
+    ) -> Result<(String, String), Box<dyn std::error::Error>> {
         let video_url = video_info.get_video_url(selected_quality_index);
-        self.logger.verbose(&format!("video url for '{}' is '{}'", video_info.quality_description[selected_quality_index], video_url));
+        self.logger.verbose(&format!(
+            "video url for '{}' is '{}'",
+            video_info.quality_description[selected_quality_index], video_url
+        ));
         let audio_url = video_info.get_audio_url();
-        self.logger.verbose(&format!("audio url is '{}'", audio_url));
+        self.logger
+            .verbose(&format!("audio url is '{}'", audio_url));
 
+        let video_file_path = format!("./{}_video.mp4", video_info.title);
         self.logger.info("视频下载中");
         let video_bytes = self.crawler.fetch_body(&video_url).await?;
-        let mut video_file = File::create(format!("./{}_video.mp4", video_info.title))?;
+        let mut video_file = File::create(&video_file_path)?;
         video_file.write_all(&video_bytes)?;
 
+        let audio_file_path = format!("./{}_audio.mp4", video_info.title);
         self.logger.info("音频下载中");
         let audio_bytes = self.crawler.fetch_body(&audio_url).await?;
-        let mut audio_file = File::create(format!("./{}audio.mp4", video_info.title))?;
+        let mut audio_file = File::create(&audio_file_path)?;
         audio_file.write_all(&audio_bytes)?;
-        Ok(())
+
+        Ok((video_file_path, audio_file_path))
+    }
+
+    pub fn merge_video_and_audio(&self, video_file_path: String, audio_file_path: String, title: String) {
+        let output = Command::new("ffmpeg")
+            .arg("-i")
+            .arg(&video_file_path)
+            .arg("-i")
+            .arg(&audio_file_path)
+            .arg("-c:v")
+            .arg("copy")
+            .arg("-c:a")
+            .arg("aac")
+            .arg(&format!("{title}.mp4"))
+            .output()
+            .expect("合并视频音频失败");
+        match output.status.code() {
+            Some(0) => {
+                self.logger.info("视频音频合并成功");
+            }
+            _ => {
+                self.logger.fatal("视频音频合并失败");
+                self.logger.fatal(&format!(
+                    "ffmpeg stderr: {:}",
+                    String::from_utf8(output.stderr).unwrap()
+                ))
+            }
+        }
+        self.logger.verbose(&format!(
+            "ffmpeg stdout: {:}",
+            String::from_utf8(output.stdout).unwrap()
+        ))
     }
 }
