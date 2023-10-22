@@ -82,7 +82,7 @@ async fn main() {
             panic!("{:?}", error)
         }
     };
-    video.download(&video_info, selected_quality_index).await;
+    let _ = video.download(&video_info, selected_quality_index).await;
 }
 
 #[cfg(test)]

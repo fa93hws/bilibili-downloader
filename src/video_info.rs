@@ -52,7 +52,7 @@ pub struct RawVideoInfo {
 }
 
 pub struct VideoInfo {
-    title: String,
+    pub title: String,
     pub quality_description: Vec<String>,
     pub quality: Vec<u8>,
     video: Vec<Video>,

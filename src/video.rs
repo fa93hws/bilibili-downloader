@@ -1,6 +1,6 @@
 use std::{time::SystemTime, fs::File, io::Write};
 
-use crate::{crawler::Crawler, logger::Logger, video_info::{RawVideoInfo, VideoInfo, VideoParseError, self}};
+use crate::{crawler::Crawler, logger::Logger, video_info::{RawVideoInfo, VideoInfo, VideoParseError}};
 use scraper::{Html, Selector};
 
 pub struct Video<'a> {
@@ -74,12 +74,12 @@ impl<'a> Video<'a> {
 
         self.logger.info("视频下载中");
         let video_bytes = self.crawler.fetch_body(&video_url).await?;
-        let mut video_file = File::create("./video.mp4")?;
+        let mut video_file = File::create(format!("./{}_video.mp4", video_info.title))?;
         video_file.write_all(&video_bytes)?;
 
         self.logger.info("音频下载中");
         let audio_bytes = self.crawler.fetch_body(&audio_url).await?;
-        let mut audio_file = File::create("./audio.mp4")?;
+        let mut audio_file = File::create(format!("./{}audio.mp4", video_info.title))?;
         audio_file.write_all(&audio_bytes)?;
         Ok(())
     }
