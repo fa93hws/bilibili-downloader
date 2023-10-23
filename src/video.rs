@@ -1,10 +1,11 @@
-use std::{fs::File, io::Write, process::Command, time::SystemTime};
+use std::{fs::File, io::Write, process::Command};
 
 use crate::{
     crawler::Crawler,
     logger::Logger,
-    video_info::{RawVideoInfo, VideoInfo, VideoParseError},
+    video_info::{RawVideoInfo, VideoInfo},
 };
+use anyhow::{anyhow, Result};
 use scraper::{Html, Selector};
 
 pub struct Video<'a> {
@@ -22,31 +23,25 @@ impl<'a> Video<'a> {
         }
     }
 
-    fn extract_title(&self, document: &Html) -> String {
+    fn extract_title(&self, document: &Html) -> Result<String> {
         let title_selector = Selector::parse("h1").unwrap();
         let mut potential_titles: Vec<String> = Vec::new();
         for title_element in document.select(&title_selector) {
             potential_titles.push(title_element.inner_html());
         }
         if potential_titles.len() > 1 {
-            self.logger.warn(&format!("multiple <h1> tag found in the page '{}', while only 1 is expected. The first one will be used", self.url));
-            return potential_titles[0].to_string();
-        } else if potential_titles.is_empty() {
-            self.logger.warn(&format!(
-                "no <h1> tag found in the page '{}', will use timestamp for the title",
+            return Err(anyhow!(
+                "multiple <h1> tag found in the page '{}'",
                 self.url
             ));
-            return SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-                .to_string();
+        } else if potential_titles.is_empty() {
+            return Err(anyhow!("no <h1> tag found in the page '{}'", self.url));
         } else {
-            return potential_titles[0].to_string();
+            return Ok(potential_titles[0].to_string());
         }
     }
 
-    fn extract_video_json(&self, document: &Html) -> Result<String, VideoParseError> {
+    fn extract_video_json(&self, document: &Html) -> Result<String> {
         let script_selector = Selector::parse("script").unwrap();
         let prefix = "window.__playinfo__=";
         for script_element in document.select(&script_selector) {
@@ -55,17 +50,14 @@ impl<'a> Video<'a> {
                 return Ok(script[prefix.len()..].to_owned());
             }
         }
-        return Err(VideoParseError::new(format!(
-            "can't find video json from '{}'",
-            self.url
-        )));
+        return Err(anyhow!("can't find video json from '{}'", self.url));
     }
 
-    pub async fn get_video_info(&self) -> Result<VideoInfo, Box<dyn std::error::Error>> {
+    pub async fn get_video_info(&self) -> Result<VideoInfo> {
         let body_bytes = self.crawler.fetch_body(&self.url).await?;
         let body_str = std::str::from_utf8(&body_bytes)?;
         let document = Html::parse_document(body_str);
-        let title = self.extract_title(&document);
+        let title = self.extract_title(&document)?;
         self.logger.info(&format!("title found as '{title}'"));
         let video_json_str = self.extract_video_json(&document)?;
         let raw_video_info: RawVideoInfo = serde_json::from_str(&video_json_str)?;
@@ -77,7 +69,7 @@ impl<'a> Video<'a> {
         &self,
         video_info: &VideoInfo,
         selected_quality_index: usize,
-    ) -> Result<(String, String), Box<dyn std::error::Error>> {
+    ) -> Result<(String, String)> {
         let video_url = video_info.get_video_url(selected_quality_index);
         self.logger.verbose(&format!(
             "video url for '{}' is '{}'",
@@ -102,7 +94,12 @@ impl<'a> Video<'a> {
         Ok((video_file_path, audio_file_path))
     }
 
-    pub fn merge_video_and_audio(&self, video_file_path: String, audio_file_path: String, title: String) {
+    pub fn merge_video_and_audio(
+        &self,
+        video_file_path: String,
+        audio_file_path: String,
+        title: String,
+    ) {
         let output = Command::new("ffmpeg")
             .arg("-i")
             .arg(&video_file_path)
@@ -131,5 +128,46 @@ impl<'a> Video<'a> {
             "ffmpeg stdout: {:}",
             String::from_utf8(output.stdout).unwrap()
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use scraper::Html;
+
+    #[test]
+    fn extract_title_success() {
+        let html_str = "<html><h1>foo</h1></html>";
+        let document = Html::parse_document(html_str);
+        let logger = Logger::new(0);
+        let crawler = Crawler::new("", &logger);
+        let video = Video::new("", &crawler, &logger);
+        let title = video
+            .extract_title(&document)
+            .expect("title should be extracted");
+        assert_eq!(title, "foo");
+    }
+
+    #[test]
+    fn extract_title_multiple_title() {
+        let html_str = "<html><h1>bar</h1><h1>foo</h1></html>";
+        let document = Html::parse_document(html_str);
+        let logger = Logger::new(0);
+        let crawler = Crawler::new("", &logger);
+        let video = Video::new("", &crawler, &logger);
+        let title = video.extract_title(&document);
+        assert_eq!(title.is_ok(), false);
+    }
+
+    #[test]
+    fn extract_title_no_title() {
+        let html_str = "<html><h2>bar</h2><h2>foo</h2></html>";
+        let document = Html::parse_document(html_str);
+        let logger = Logger::new(0);
+        let crawler = Crawler::new("", &logger);
+        let video = Video::new("", &crawler, &logger);
+        let title = video.extract_title(&document);
+        assert_eq!(title.is_ok(), false);
     }
 }

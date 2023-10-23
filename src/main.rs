@@ -85,10 +85,10 @@ async fn main() {
     match video.download(&video_info, selected_quality_index).await {
         Ok((video_file_path, audio_file_path)) => {
             video.merge_video_and_audio(video_file_path, audio_file_path, video_info.title);
-        },
+        }
         Err(error) => {
             logger.fatal("下载视频音频失败");
-            panic!("{:?}", error) 
+            panic!("{:?}", error)
         }
     }
 }
@@ -105,40 +105,66 @@ mod tests {
     #[test]
     fn read_config_config_not_exist() {
         let temp_dir = TempDir::new("read_config").unwrap();
-        let temp_file = temp_dir.path().join("non_existing").to_str().unwrap().to_owned();
+        let temp_file = temp_dir
+            .path()
+            .join("non_existing")
+            .to_str()
+            .unwrap()
+            .to_owned();
         let logger = Logger::new(0);
         let config = read_config(&temp_file, &logger);
-        assert_eq!(config, Config {
-            sess_data: "".to_owned(),
-        }, "sess_data should be parsed to '' if no config is presented");
+        assert_eq!(
+            config,
+            Config {
+                sess_data: "".to_owned(),
+            },
+            "sess_data should be parsed to '' if no config is presented"
+        );
     }
 
     #[test]
     fn read_config_missing_sess_data() {
         let temp_dir = TempDir::new("read_config").unwrap();
-        let temp_file = temp_dir.path().join("missing_sess_data").to_str().unwrap().to_owned();
+        let temp_file = temp_dir
+            .path()
+            .join("missing_sess_data")
+            .to_str()
+            .unwrap()
+            .to_owned();
         let config_content = "{}";
         fs::write(&temp_file, config_content).expect("Unable to write file");
         let logger = Logger::new(0);
         let config = read_config(&temp_file, &logger);
-        assert_eq!(config, Config {
-            sess_data: "".to_owned(),
-        }, "sess_data should be parsed to '' if config does not contain SESSDATA");
+        assert_eq!(
+            config,
+            Config {
+                sess_data: "".to_owned(),
+            },
+            "sess_data should be parsed to '' if config does not contain SESSDATA"
+        );
     }
 
     #[test]
     fn read_config_wrong_sess_type() {
         let temp_dir = TempDir::new("read_config").unwrap();
-        let temp_file = temp_dir.path().join("wrong_sess_type").to_str().unwrap().to_owned();
+        let temp_file = temp_dir
+            .path()
+            .join("wrong_sess_type")
+            .to_str()
+            .unwrap()
+            .to_owned();
         let config_content = "{ \"SESSDATA\": 2 }";
         fs::write(&temp_file, config_content).expect("Unable to write file");
         let logger = Logger::new(0);
         let config = read_config(&temp_file, &logger);
-        assert_eq!(config, Config {
-            sess_data: "".to_owned(),
-        }, "sess_data should be parsed to '' if SESSDATA is not a string");
+        assert_eq!(
+            config,
+            Config {
+                sess_data: "".to_owned(),
+            },
+            "sess_data should be parsed to '' if SESSDATA is not a string"
+        );
     }
-
 
     #[test]
     fn read_config_success() {
@@ -148,8 +174,12 @@ mod tests {
         fs::write(&temp_file, config_content).expect("Unable to write file");
         let logger = Logger::new(0);
         let config = read_config(&temp_file, &logger);
-        assert_eq!(config, Config {
-            sess_data: "2".to_owned(),
-        }, "sess_data should be parsed correctly");
+        assert_eq!(
+            config,
+            Config {
+                sess_data: "2".to_owned(),
+            },
+            "sess_data should be parsed correctly"
+        );
     }
 }

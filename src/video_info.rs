@@ -1,24 +1,7 @@
-use std::{collections::HashSet, error::Error, fmt};
+use std::collections::HashSet;
 
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone)]
-pub struct VideoParseError {
-  message: String,
-}
-
-impl Error for VideoParseError {}
-
-impl fmt::Display for VideoParseError {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-      write!(f, "{}", self.message)
-  }
-}
-impl VideoParseError {
-  pub fn new(message: String) -> Self {
-      VideoParseError { message }
-  }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Audio {
@@ -60,21 +43,34 @@ pub struct VideoInfo {
 }
 
 impl VideoInfo {
-    pub fn new(title: String, raw_video_info: RawVideoInfo) -> Result<Self, VideoParseError> {
+    pub fn new(title: String, raw_video_info: RawVideoInfo) -> Result<Self> {
         let all_quality = raw_video_info.data.accept_quality;
         let all_description = raw_video_info.data.accept_description;
         let dash = raw_video_info.data.dash;
-        let mut available_quality = dash.video.iter().map(|v| v.id).collect::<HashSet<u8>>().into_iter().collect::<Vec<u8>>();
+        let mut available_quality = dash
+            .video
+            .iter()
+            .map(|v| v.id)
+            .collect::<HashSet<u8>>()
+            .into_iter()
+            .collect::<Vec<u8>>();
         available_quality.sort_by(|a, b| b.cmp(a));
         let mut quality_not_found: Vec<u8> = Vec::new();
-        let quality_description = available_quality.iter().map(|q| {
-          match all_quality.iter().position(|r| r == q) {
-            Some(index) => String::from(&all_description[index]),
-            None => { quality_not_found.push(*q); return "".to_owned() }
-          }
-        }).collect::<Vec<String>>();
+        let quality_description = available_quality
+            .iter()
+            .map(|q| match all_quality.iter().position(|r| r == q) {
+                Some(index) => String::from(&all_description[index]),
+                None => {
+                    quality_not_found.push(*q);
+                    return "".to_owned();
+                }
+            })
+            .collect::<Vec<String>>();
         if quality_not_found.len() > 0 {
-          return Err(VideoParseError::new(format!("no description found for quality id = {:?}", quality_not_found)));
+            return Err(anyhow!(
+                "no description found for quality id = {:?}",
+                quality_not_found
+            ));
         }
 
         Ok(VideoInfo {
@@ -87,27 +83,27 @@ impl VideoInfo {
     }
 
     pub fn get_video_url(&self, selected_quality_index: usize) -> String {
-      let mut max_bandwidth = 0;
-      let mut url = String::new();
-      let quality = self.quality[selected_quality_index];
-      for video in &self.video {
-        if video.id == quality && video.bandwidth > max_bandwidth {
-          max_bandwidth = video.bandwidth;
-          url = video.base_url.clone();
+        let mut max_bandwidth = 0;
+        let mut url = String::new();
+        let quality = self.quality[selected_quality_index];
+        for video in &self.video {
+            if video.id == quality && video.bandwidth > max_bandwidth {
+                max_bandwidth = video.bandwidth;
+                url = video.base_url.clone();
+            }
         }
-      }
-      return url;
+        return url;
     }
 
     pub fn get_audio_url(&self) -> String {
-      let mut max_bandwidth = 0;
-      let mut url = String::new();
-      for audio in &self.audio {
-        if audio.bandwidth > max_bandwidth {
-          max_bandwidth = audio.bandwidth;
-          url = audio.base_url.clone();
+        let mut max_bandwidth = 0;
+        let mut url = String::new();
+        for audio in &self.audio {
+            if audio.bandwidth > max_bandwidth {
+                max_bandwidth = audio.bandwidth;
+                url = audio.base_url.clone();
+            }
         }
-      }
-      return url;
+        return url;
     }
 }

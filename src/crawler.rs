@@ -1,5 +1,6 @@
 use crate::logger::Logger;
 
+use anyhow::Result;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
 use std::io::Read;
@@ -17,7 +18,7 @@ impl<'a> Crawler<'a> {
         }
     }
 
-    pub async fn fetch_body(&self, url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    pub async fn fetch_body(&self, url: &str) -> Result<Vec<u8>> {
         let mut cookie = "CURRENT_QUALITY=32;".to_owned();
         if self.sess_data != "" {
             cookie.push_str(&format!("SESSDATA={};", self.sess_data));
