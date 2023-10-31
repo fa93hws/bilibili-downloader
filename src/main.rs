@@ -9,7 +9,7 @@ use std::fs;
 use clap::Parser;
 use crawler::Crawler;
 use dialoguer::Select;
-use logger::Logger;
+use logger::{Logger, Logging};
 use video::Video;
 
 #[derive(Parser, Debug)]

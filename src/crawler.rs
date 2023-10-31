@@ -1,17 +1,17 @@
-use crate::logger::Logger;
+use crate::logger::Logging;
 
 use anyhow::Result;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
 use std::io::Read;
 
-pub struct Crawler<'a> {
+pub struct Crawler<'a, T: Logging> {
     sess_data: String,
-    logger: &'a Logger,
+    logger: &'a T,
 }
 
-impl<'a> Crawler<'a> {
-    pub fn new(sess_data: &str, logger: &'a Logger) -> Self {
+impl<'a, T: Logging> Crawler<'a, T> {
+    pub fn new(sess_data: &str, logger: &'a T) -> Self {
         Crawler {
             sess_data: String::from(sess_data),
             logger,

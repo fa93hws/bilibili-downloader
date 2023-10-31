@@ -2,20 +2,20 @@ use std::{fs::File, io::Write, process::Command};
 
 use crate::{
     crawler::Crawler,
-    logger::Logger,
+    logger::Logging,
     video_info::{RawVideoInfo, VideoInfo},
 };
 use anyhow::{anyhow, Result};
 use scraper::{Html, Selector};
 
-pub struct Video<'a> {
+pub struct Video<'a, T: Logging> {
     url: String,
-    crawler: &'a Crawler<'a>,
-    logger: &'a Logger,
+    crawler: &'a Crawler<'a, T>,
+    logger: &'a T,
 }
 
-impl<'a> Video<'a> {
-    pub fn new(id: &str, crawler: &'a Crawler, logger: &'a Logger) -> Self {
+impl<'a, T: Logging> Video<'a, T> {
+    pub fn new(id: &str, crawler: &'a Crawler<T>, logger: &'a T) -> Self {
         Video {
             url: format!("https://www.bilibili.com/video/{id}/"),
             crawler,
@@ -133,6 +133,8 @@ impl<'a> Video<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::logger::Logger;
+
     use super::*;
     use scraper::Html;
 
