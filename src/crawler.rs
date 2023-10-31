@@ -1,9 +1,15 @@
 use crate::logger::Logging;
 
+use async_trait::async_trait;
 use anyhow::Result;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
 use std::io::Read;
+
+#[async_trait(?Send)]
+pub trait Fetching {
+    async fn fetch_body(&self, url: &str) -> Result<Vec<u8>>;
+}
 
 pub struct Crawler<'a, T: Logging> {
     sess_data: String,
@@ -17,8 +23,11 @@ impl<'a, T: Logging> Crawler<'a, T> {
             logger,
         }
     }
+}
 
-    pub async fn fetch_body(&self, url: &str) -> Result<Vec<u8>> {
+#[async_trait(?Send)]
+impl<'a, T: Logging> Fetching for Crawler<'a, T> {
+    async fn fetch_body(&self, url: &str) -> Result<Vec<u8>> {
         let mut cookie = "CURRENT_QUALITY=32;".to_owned();
         if self.sess_data != "" {
             cookie.push_str(&format!("SESSDATA={};", self.sess_data));

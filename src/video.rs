@@ -1,21 +1,21 @@
 use std::{fs::File, io::Write, process::Command};
 
 use crate::{
-    crawler::Crawler,
+    crawler::Fetching,
     logger::Logging,
     video_info::{RawVideoInfo, VideoInfo},
 };
 use anyhow::{anyhow, Result};
 use scraper::{Html, Selector};
 
-pub struct Video<'a, T: Logging> {
+pub struct Video<'a, L: Logging, F: Fetching> {
     url: String,
-    crawler: &'a Crawler<'a, T>,
-    logger: &'a T,
+    crawler: &'a F,
+    logger: &'a L,
 }
 
-impl<'a, T: Logging> Video<'a, T> {
-    pub fn new(id: &str, crawler: &'a Crawler<T>, logger: &'a T) -> Self {
+impl<'a, L: Logging, F: Fetching> Video<'a, L, F> {
+    pub fn new(id: &str, logger: &'a L, crawler: &'a F) -> Self {
         Video {
             url: format!("https://www.bilibili.com/video/{id}/"),
             crawler,
@@ -133,7 +133,7 @@ impl<'a, T: Logging> Video<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::logger::Logger;
+    use crate::{logger::Logger, crawler::Crawler};
 
     use super::*;
     use scraper::Html;
@@ -144,7 +144,7 @@ mod tests {
         let document = Html::parse_document(html_str);
         let logger = Logger::new(0);
         let crawler = Crawler::new("", &logger);
-        let video = Video::new("", &crawler, &logger);
+        let video = Video::new("", &logger, &crawler);
         let title = video
             .extract_title(&document)
             .expect("title should be extracted");
@@ -157,7 +157,7 @@ mod tests {
         let document = Html::parse_document(html_str);
         let logger = Logger::new(0);
         let crawler = Crawler::new("", &logger);
-        let video = Video::new("", &crawler, &logger);
+        let video = Video::new("", &logger, &crawler);
         let title = video.extract_title(&document);
         assert_eq!(title.is_ok(), false);
     }
@@ -168,7 +168,7 @@ mod tests {
         let document = Html::parse_document(html_str);
         let logger = Logger::new(0);
         let crawler = Crawler::new("", &logger);
-        let video = Video::new("", &crawler, &logger);
+        let video = Video::new("", &logger, &crawler);
         let title = video.extract_title(&document);
         assert_eq!(title.is_ok(), false);
     }

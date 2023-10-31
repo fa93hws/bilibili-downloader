@@ -62,7 +62,7 @@ async fn main() {
 
     let config = read_config("./config.json", &logger);
     let crawler = Crawler::new(&config.sess_data, &logger);
-    let video = Video::new(&args.video_id, &crawler, &logger);
+    let video = Video::new(&args.video_id, &logger, &crawler);
     let video_info = match video.get_video_info().await {
         Err(error) => {
             logger.fatal("failed to find raw video info");
