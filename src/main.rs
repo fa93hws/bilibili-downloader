@@ -1,8 +1,8 @@
+mod bilibili;
 mod crawler;
 mod logger;
-mod video;
-mod video_info;
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -10,7 +10,6 @@ use clap::Parser;
 use crawler::Crawler;
 use dialoguer::Select;
 use logger::{Logger, Logging};
-use video::Video;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -54,25 +53,18 @@ fn read_config(path: &str, logger: &Logger) -> Config {
     }
 }
 
-#[tokio::main]
-async fn main() {
+async fn main_inner() -> Result<()> {
     let args: Args = Args::parse();
     let logger = Logger::new(args.log_level);
     logger.debug(&format!("args are: {:#?}", args));
 
     let config = read_config("./config.json", &logger);
     let crawler = Crawler::new(&config.sess_data, &logger);
-    let video = Video::new(&args.video_id, &logger, &crawler);
-    let video_info = match video.get_video_info().await {
-        Err(error) => {
-            logger.fatal("failed to find raw video info");
-            panic!("{:?}", error);
-        }
-        Ok(val) => val,
-    };
+    let video =
+        bilibili::video::Video::fetch_info(args.video_id.clone(), &crawler, &logger).await?;
     let selected_quality_index = match Select::new()
         .with_prompt("quality?")
-        .items(&video_info.quality_description)
+        .items(&video.get_quality_description())
         .default(0)
         .interact()
     {
@@ -82,10 +74,14 @@ async fn main() {
             panic!("{:?}", error)
         }
     };
-    if let Err(e) = video.download(&video_info, selected_quality_index).await {
-        logger.fatal("下载视频音频失败");
-        panic!("{:?}", e)
-    }
+    video
+        .download(selected_quality_index, String::from("download"))
+        .await
+}
+
+#[tokio::main]
+async fn main() {
+    main_inner().await.expect("视频下载失败");
 }
 
 #[cfg(test)]

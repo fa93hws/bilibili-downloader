@@ -1,10 +1,14 @@
 use crate::logger::Logging;
 
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
-use std::{fs, io::{Read, Write}, path::PathBuf};
+use std::{
+    fs,
+    io::{Read, Write},
+    path::PathBuf,
+};
 
 #[async_trait(?Send)]
 pub trait Fetching {
@@ -72,7 +76,8 @@ impl<'a, T: Logging> Fetching for Crawler<'a, T> {
         self.logger.verbose(&format!("downloading '{url}'"));
         let content_bytes = self.fetch_body(url).await?;
         // TODO Change to buffer
-        self.logger.verbose(&format!("writing to '{}'", output.display()));
+        self.logger
+            .verbose(&format!("writing to '{}'", output.display()));
         let mut file = fs::File::create(output)?;
         file.write_all(&content_bytes)?;
         Ok(())
