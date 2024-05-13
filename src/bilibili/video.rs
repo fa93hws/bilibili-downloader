@@ -2,14 +2,14 @@ use std::{fs, path::PathBuf, process::Command};
 
 use anyhow::{anyhow, Result};
 
-use crate::{crawler::Fetching, logger::Logging};
+use crate::{crawler::Fetching, logger::Logger};
 
 use super::api::{self, bv::BVInfo};
 
-pub struct Video<'a, L: Logging, F: Fetching> {
+pub struct Video<'a, F: Fetching> {
     info: BVInfo,
     title: String,
-    logger: &'a L,
+    logger: &'a Logger,
     crawler: &'a F,
 }
 
@@ -19,8 +19,8 @@ struct VideoSource {
     audio_url: String,
 }
 
-impl<'a, L: Logging, F: Fetching> Video<'a, L, F> {
-    pub async fn fetch_info(id: String, crawler: &'a F, logger: &'a L) -> Result<Self> {
+impl<'a, F: Fetching> Video<'a, F> {
+    pub async fn fetch_info(id: String, crawler: &'a F, logger: &'a Logger) -> Result<Self> {
         let (info, title) = api::bv::get_bv_info(crawler, logger, &id).await?;
         Ok(Self {
             logger,

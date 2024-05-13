@@ -10,14 +10,6 @@ enum SEVERITY {
     DEBUG = 7,
 }
 
-pub trait Logging {
-    fn debug(&self, message: &str);
-    fn verbose(&self, message: &str);
-    fn info(&self, message: &str);
-    fn warn(&self, message: &str);
-    fn fatal(&self, message: &str);
-}
-
 pub struct Logger {
     log_level: u8,
 }
@@ -28,36 +20,36 @@ impl Logger {
     }
 }
 
-impl Logging for Logger {
-    fn verbose(&self, message: &str) {
+impl Logger {
+    pub fn verbose(&self, message: &str) {
         if self.log_level >= SEVERITY::VERBOSE as u8 {
             let log_message = format!("[verbose] {message}");
             println!("{}", log_message.truecolor(128, 128, 128))
         }
     }
 
-    fn fatal(&self, message: &str) {
+    pub fn fatal(&self, message: &str) {
         if self.log_level >= SEVERITY::FATAL as u8 {
             let log_message = format!("[fatal] {message}");
             println!("{}", log_message.red())
         }
     }
 
-    fn debug(&self, message: &str) {
+    pub fn debug(&self, message: &str) {
         if self.log_level >= SEVERITY::DEBUG as u8 {
             let log_message = format!("[debug] {message}");
             println!("{}", log_message.truecolor(128, 128, 128))
         }
     }
 
-    fn warn(&self, message: &str) {
+    pub fn warn(&self, message: &str) {
         if self.log_level >= SEVERITY::WARN as u8 {
             let log_message = format!("[warn] {message}");
             println!("{}", log_message.yellow())
         }
     }
 
-    fn info(&self, message: &str) {
+    pub fn info(&self, message: &str) {
         if self.log_level >= SEVERITY::INFO as u8 {
             let log_message = format!("[info] {message}");
             println!("{}", log_message.green())

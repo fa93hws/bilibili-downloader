@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 
-use crate::{crawler::Fetching, logger::Logging};
+use crate::{crawler::Fetching, logger::Logger};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Audio {
@@ -57,7 +57,12 @@ fn extract_video_json(document: &Html, video_url: &String) -> Result<String> {
     let script_selector = Selector::parse("script").unwrap();
     let prefix = "window.__playinfo__=";
     for script_element in document.select(&script_selector) {
-        let script = script_element.text().collect::<Vec<_>>().join("").trim().to_owned();
+        let script = script_element
+            .text()
+            .collect::<Vec<_>>()
+            .join("")
+            .trim()
+            .to_owned();
         if script.starts_with(prefix) {
             return Ok(script[prefix.len()..].to_owned());
         }
@@ -65,9 +70,9 @@ fn extract_video_json(document: &Html, video_url: &String) -> Result<String> {
     return Err(anyhow!("can't find video json from '{}'", video_url));
 }
 
-pub async fn get_bv_info<'a, T: Logging, F: Fetching>(
+pub async fn get_bv_info<'a, F: Fetching>(
     crawler: &F,
-    logger: &T,
+    logger: &Logger,
     id: &String,
 ) -> Result<(BVInfo, String)> {
     let video_url = format!("https://www.bilibili.com/video/{id}/");
@@ -133,7 +138,7 @@ mod tests {
         let html_str = r#"<html><script>window.__playinfo__=foo</script></html>"#;
         let document = Html::parse_document(html_str);
         let video_json_str = extract_video_json(&document, &String::from(""));
-        assert_eq!(video_json_str.is_ok(), false);
+        assert_eq!(video_json_str.unwrap(), "foo");
     }
 
     #[test]
@@ -192,7 +197,8 @@ mod tests {
             Ok(mock_html_str.to_owned().into_bytes())
         });
         let (info, title) = get_bv_info(&mock_crawler, &logger, &String::from("BV12345678"))
-            .await.unwrap();
+            .await
+            .unwrap();
         assert_eq!(title, "fake title");
         assert_eq!(
             info.data.accept_description,

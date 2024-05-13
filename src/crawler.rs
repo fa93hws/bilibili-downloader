@@ -1,4 +1,4 @@
-use crate::logger::Logging;
+use crate::logger::Logger;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -20,13 +20,13 @@ pub trait Fetching {
     async fn download_to(&self, url: &String, output: PathBuf) -> Result<()>;
 }
 
-pub struct Crawler<'a, T: Logging> {
+pub struct Crawler<'a> {
     sess_data: String,
-    logger: &'a T,
+    logger: &'a Logger,
 }
 
-impl<'a, T: Logging> Crawler<'a, T> {
-    pub fn new(sess_data: &str, logger: &'a T) -> Self {
+impl<'a> Crawler<'a> {
+    pub fn new(sess_data: &str, logger: &'a Logger) -> Self {
         Crawler {
             sess_data: String::from(sess_data),
             logger,
@@ -35,7 +35,7 @@ impl<'a, T: Logging> Crawler<'a, T> {
 }
 
 #[async_trait(?Send)]
-impl<'a, T: Logging> Fetching for Crawler<'a, T> {
+impl<'a> Fetching for Crawler<'a> {
     async fn fetch_body(&self, url: &String) -> Result<Vec<u8>> {
         let mut cookie = "CURRENT_QUALITY=32;".to_owned();
         if self.sess_data != "" {
