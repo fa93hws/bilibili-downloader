@@ -4,11 +4,12 @@ use async_trait::async_trait;
 use anyhow::Result;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
-use std::io::Read;
+use std::{fs, io::{Read, Write}, path::PathBuf};
 
 #[async_trait(?Send)]
 pub trait Fetching {
-    async fn fetch_body(&self, url: &str) -> Result<Vec<u8>>;
+    async fn fetch_body(&self, url: &String) -> Result<Vec<u8>>;
+    async fn download_to(&self, url: &String, output: PathBuf) -> Result<()>;
 }
 
 pub struct Crawler<'a, T: Logging> {
@@ -27,7 +28,7 @@ impl<'a, T: Logging> Crawler<'a, T> {
 
 #[async_trait(?Send)]
 impl<'a, T: Logging> Fetching for Crawler<'a, T> {
-    async fn fetch_body(&self, url: &str) -> Result<Vec<u8>> {
+    async fn fetch_body(&self, url: &String) -> Result<Vec<u8>> {
         let mut cookie = "CURRENT_QUALITY=32;".to_owned();
         if self.sess_data != "" {
             cookie.push_str(&format!("SESSDATA={};", self.sess_data));
@@ -62,5 +63,18 @@ impl<'a, T: Logging> Fetching for Crawler<'a, T> {
         } else {
             Ok(Vec::from(&body_bytes[..]))
         }
+    }
+
+    async fn download_to(&self, url: &String, output: PathBuf) -> Result<()> {
+        if let Some(output_dir) = output.parent() {
+            fs::create_dir_all(output_dir)?;
+        };
+        self.logger.verbose(&format!("downloading '{url}'"));
+        let content_bytes = self.fetch_body(url).await?;
+        // TODO Change to buffer
+        self.logger.verbose(&format!("writing to '{}'", output.display()));
+        let mut file = fs::File::create(output)?;
+        file.write_all(&content_bytes)?;
+        Ok(())
     }
 }
