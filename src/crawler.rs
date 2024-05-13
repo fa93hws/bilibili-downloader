@@ -10,6 +10,10 @@ use std::{
     path::PathBuf,
 };
 
+#[cfg(test)]
+use mockall::automock;
+
+#[cfg_attr(test, automock)]
 #[async_trait(?Send)]
 pub trait Fetching {
     async fn fetch_body(&self, url: &String) -> Result<Vec<u8>>;

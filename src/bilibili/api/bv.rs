@@ -57,7 +57,7 @@ fn extract_video_json(document: &Html, video_url: &String) -> Result<String> {
     let script_selector = Selector::parse("script").unwrap();
     let prefix = "window.__playinfo__=";
     for script_element in document.select(&script_selector) {
-        let script = script_element.text().collect::<Vec<_>>().join("");
+        let script = script_element.text().collect::<Vec<_>>().join("").trim().to_owned();
         if script.starts_with(prefix) {
             return Ok(script[prefix.len()..].to_owned());
         }
@@ -83,6 +83,8 @@ pub async fn get_bv_info<'a, T: Logging, F: Fetching>(
 
 #[cfg(test)]
 mod tests {
+    use crate::crawler::MockFetching;
+
     use super::*;
 
     #[test]
@@ -107,5 +109,115 @@ mod tests {
         let document = Html::parse_document(html_str);
         let title = extract_title(&document, &String::from(""));
         assert_eq!(title.is_ok(), false);
+    }
+
+    #[test]
+    fn extract_video_json_success() {
+        let html_str = r#"<html><script>window.__playinfo__={"foo": "bar"}</script></html>"#;
+        let document = Html::parse_document(html_str);
+        let video_json_str =
+            extract_video_json(&document, &String::from("")).expect("json should be extracted");
+        assert_eq!(video_json_str, r#"{"foo": "bar"}"#);
+    }
+
+    #[test]
+    fn extract_video_json_no_script() {
+        let html_str = "<html><h1>foo</h1></html>";
+        let document = Html::parse_document(html_str);
+        let video_json_str = extract_video_json(&document, &String::from(""));
+        assert_eq!(video_json_str.is_ok(), false);
+    }
+
+    #[test]
+    fn extract_video_json_no_json() {
+        let html_str = r#"<html><script>window.__playinfo__=foo</script></html>"#;
+        let document = Html::parse_document(html_str);
+        let video_json_str = extract_video_json(&document, &String::from(""));
+        assert_eq!(video_json_str.is_ok(), false);
+    }
+
+    #[test]
+    fn extract_video_json_no_window() {
+        let html_str = r#"<html><script>foo=bar</script></html>"#;
+        let document = Html::parse_document(html_str);
+        let video_json_str = extract_video_json(&document, &String::from(""));
+        assert_eq!(video_json_str.is_ok(), false);
+    }
+
+    #[tokio::test]
+    async fn get_bv_info_success() {
+        let logger = crate::logger::Logger::new(0);
+        let mut mock_crawler = MockFetching::new();
+        let mock_html_str = r#"
+        <html>
+            <script>
+                window.__playinfo__={
+                    "data": {
+                        "accept_description":["超清 4K","高清 1080P60","高清 1080P","高清 720P","清晰 480P","流畅 360P"],
+                        "accept_quality":[120,116,80,64,32,16],
+                        "dash": {
+                            "video": [{
+                                "id": 120,
+                                "base_url": "base_url__v_120_0",
+                                "bandwidth": 1200
+                            }, {
+                                "id": 120,
+                                "base_url": "base_url_v_1201",
+                                "bandwidth": 1201
+                            }, {
+                                "id": 116,
+                                "base_url": "base_url_v_116",
+                                "bandwidth": 116
+                            }],
+                            "audio": [{
+                                "id": 30280,
+                                "base_url": "base_url_a_30280",
+                                "bandwidth": 30280
+                            }, {
+                                "id": 30216,
+                                "base_url": "base_url_a_30216",
+                                "bandwidth": 30216
+                            }]
+                        }
+                    }
+                }
+            </script>
+            <body>
+                <h1>fake title</h1>
+            </body>
+        </html>
+        "#;
+        mock_crawler.expect_fetch_body().times(1).returning(|url| {
+            assert_eq!(url, "https://www.bilibili.com/video/BV12345678/");
+            Ok(mock_html_str.to_owned().into_bytes())
+        });
+        let (info, title) = get_bv_info(&mock_crawler, &logger, &String::from("BV12345678"))
+            .await.unwrap();
+        assert_eq!(title, "fake title");
+        assert_eq!(
+            info.data.accept_description,
+            [
+                "超清 4K",
+                "高清 1080P60",
+                "高清 1080P",
+                "高清 720P",
+                "清晰 480P",
+                "流畅 360P"
+            ]
+        );
+        assert_eq!(info.data.accept_quality, [120, 116, 80, 64, 32, 16]);
+        assert_eq!(info.data.dash.video[0].id, 120);
+        assert_eq!(info.data.dash.video[0].base_url, "base_url__v_120_0");
+        assert_eq!(info.data.dash.video[0].bandwidth, 1200);
+        assert_eq!(info.data.dash.video[1].id, 120);
+        assert_eq!(info.data.dash.video[1].base_url, "base_url_v_1201");
+        assert_eq!(info.data.dash.video[1].bandwidth, 1201);
+        assert_eq!(info.data.dash.video[2].id, 116);
+        assert_eq!(info.data.dash.video[2].base_url, "base_url_v_116");
+        assert_eq!(info.data.dash.video[2].bandwidth, 116);
+        assert_eq!(info.data.dash.audio[0].base_url, "base_url_a_30280");
+        assert_eq!(info.data.dash.audio[0].bandwidth, 30280);
+        assert_eq!(info.data.dash.audio[1].base_url, "base_url_a_30216");
+        assert_eq!(info.data.dash.audio[1].bandwidth, 30216);
     }
 }
