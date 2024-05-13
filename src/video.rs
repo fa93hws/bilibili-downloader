@@ -37,7 +37,7 @@ impl<'a, L: Logging, F: Fetching> Video<'a, L, F> {
         } else if potential_titles.is_empty() {
             return Err(anyhow!("no <h1> tag found in the page '{}'", self.url));
         } else {
-            return Ok(potential_titles[0].to_string());
+            return Ok(potential_titles[0].to_string().replace("/", "|"));
         }
     }
 
@@ -81,13 +81,17 @@ impl<'a, L: Logging, F: Fetching> Video<'a, L, F> {
 
         let video_file_path = format!("./{}_video.mp4", video_info.title);
         self.logger.info("视频下载中");
+        // TODO Change to buffer
         let video_bytes = self.crawler.fetch_body(&video_url).await?;
+        self.logger.debug("视频下载成功，写入文件中");
         let mut video_file = File::create(&video_file_path)?;
         video_file.write_all(&video_bytes)?;
 
         let audio_file_path = format!("./{}_audio.mp4", video_info.title);
         self.logger.info("音频下载中");
+        // TODO Change to buffer
         let audio_bytes = self.crawler.fetch_body(&audio_url).await?;
+        self.logger.debug("音频下载成功，写入文件中");
         let mut audio_file = File::create(&audio_file_path)?;
         audio_file.write_all(&audio_bytes)?;
 
@@ -171,5 +175,18 @@ mod tests {
         let video = Video::new("", &logger, &crawler);
         let title = video.extract_title(&document);
         assert_eq!(title.is_ok(), false);
+    }
+
+    #[test]
+    fn extract_title_slash() {
+        let html_str = "<html><h1>foo/bar</h1></html>";
+        let document = Html::parse_document(html_str);
+        let logger = Logger::new(0);
+        let crawler = Crawler::new("", &logger);
+        let video = Video::new("", &logger, &crawler);
+        let title = video
+            .extract_title(&document)
+            .expect("title should be extracted");
+        assert_eq!(title, "foo|bar");
     }
 }
