@@ -19,6 +19,9 @@ struct Args {
 
     #[arg(short, long, default_value_t = 5)]
     log_level: u8,
+
+    #[arg(short, long, default_value_t = false)]
+    select_quality: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -62,17 +65,21 @@ async fn main_inner() -> Result<()> {
     let crawler = Crawler::new(&config.sess_data, &logger);
     let video =
         bilibili::video::Video::fetch_info(args.video_id.clone(), &crawler, &logger).await?;
-    let selected_quality_index = match Select::new()
-        .with_prompt("quality?")
-        .items(&video.get_quality_description())
-        .default(0)
-        .interact()
-    {
-        Ok(index) => index,
-        Err(error) => {
-            logger.fatal("failed to select the quality");
-            panic!("{:?}", error)
+    let selected_quality_index = if args.select_quality {
+        match Select::new()
+            .with_prompt("quality?")
+            .items(&video.get_quality_description())
+            .default(0)
+            .interact()
+        {
+            Ok(index) => index,
+            Err(error) => {
+                logger.fatal("failed to select the quality");
+                panic!("{:?}", error)
+            }
         }
+    } else {
+        video.get_best_quality_index()
     };
     video
         .download(selected_quality_index, String::from("download"))

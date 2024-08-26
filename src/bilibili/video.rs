@@ -44,6 +44,9 @@ impl<'a, F: Fetching> Video<'a, F> {
                 url = video.base_url.clone();
             }
         }
+        if url.len() == 0 {
+            panic!("failed to find video");
+        }
         url
     }
 
@@ -76,6 +79,19 @@ impl<'a, F: Fetching> Video<'a, F> {
             video_url,
             audio_url,
         }
+    }
+
+    pub fn get_best_quality_index(&self) -> usize {
+        let mut max_idx = 0;
+        let mut max_quality = 0;
+        for (idx, quality) in self.info.data.accept_quality.iter().enumerate() {
+            if *quality > max_quality {
+                max_quality = *quality;
+                max_idx = idx;
+            }
+        }
+        self.logger.info(&format!("use best quality: {}", self.info.data.accept_description[max_idx]));
+        max_idx
     }
 
     fn merge_video_and_audio(
