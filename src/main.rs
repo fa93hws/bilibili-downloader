@@ -14,14 +14,14 @@ use logger::Logger;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(long)]
-    video_id: String,
-
     #[arg(short, long, default_value_t = 5)]
     log_level: u8,
 
     #[arg(short, long, default_value_t = false)]
     select_quality: bool,
+
+    #[clap(index=1)]
+    video_ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -63,27 +63,41 @@ async fn main_inner() -> Result<()> {
 
     let config = read_config("./config.json", &logger);
     let crawler = Crawler::new(&config.sess_data, &logger);
-    let video =
-        bilibili::video::Video::fetch_info(args.video_id.clone(), &crawler, &logger).await?;
-    let selected_quality_index = if args.select_quality {
-        match Select::new()
-            .with_prompt("quality?")
-            .items(&video.get_quality_description())
-            .default(0)
-            .interact()
-        {
-            Ok(index) => index,
-            Err(error) => {
-                logger.fatal("failed to select the quality");
-                panic!("{:?}", error)
+
+    let mut failed_ids = Vec::new();
+
+    for video_id in args.video_ids {
+        let video =
+        bilibili::video::Video::fetch_info(video_id.clone(), &crawler, &logger).await?;
+        let selected_quality_index = if args.select_quality {
+            match Select::new()
+                .with_prompt("quality?")
+                .items(&video.get_quality_description())
+                .default(0)
+                .interact()
+            {
+                Ok(index) => index,
+                Err(error) => {
+                    logger.fatal("failed to select the quality");
+                    panic!("{:?}", error)
+                }
             }
+        } else {
+            video.get_best_quality_index()
+        };
+        let download_result = video
+            .download(selected_quality_index, String::from("download"))
+            .await;
+        if download_result.is_err() {
+            failed_ids.push(video_id);
         }
+    }
+
+    if failed_ids.len() > 0 {
+        Err(anyhow::anyhow!("failed to download: {}", failed_ids.join(", ")))
     } else {
-        video.get_best_quality_index()
-    };
-    video
-        .download(selected_quality_index, String::from("download"))
-        .await
+        Ok(())
+    }
 }
 
 #[tokio::main]
