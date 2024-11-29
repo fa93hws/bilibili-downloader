@@ -17,7 +17,7 @@ use mockall::automock;
 #[async_trait(?Send)]
 pub trait Fetching {
     async fn fetch_body(&self, url: &String) -> Result<Vec<u8>>;
-    async fn download_to(&self, url: &String, output: PathBuf) -> Result<()>;
+    async fn download_to(&self, url: &String, output: &PathBuf) -> Result<()>;
 }
 
 pub struct Crawler<'a> {
@@ -73,7 +73,7 @@ impl<'a> Fetching for Crawler<'a> {
         }
     }
 
-    async fn download_to(&self, url: &String, output: PathBuf) -> Result<()> {
+    async fn download_to(&self, url: &String, output: &PathBuf) -> Result<()> {
         if let Some(output_dir) = output.parent() {
             fs::create_dir_all(output_dir)?;
         };

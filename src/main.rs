@@ -1,14 +1,15 @@
 mod bilibili;
 mod crawler;
+mod download;
 mod logger;
 
 use anyhow::Result;
+use download::Downloader;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
 use clap::Parser;
 use crawler::Crawler;
-use dialoguer::Select;
 use logger::Logger;
 
 #[derive(Parser, Debug)]
@@ -20,7 +21,7 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     select_quality: bool,
 
-    #[clap(index=1)]
+    #[clap(index = 1)]
     video_ids: Vec<String>,
 }
 
@@ -63,38 +64,24 @@ async fn main_inner() -> Result<()> {
 
     let config = read_config("./config.json", &logger);
     let crawler = Crawler::new(&config.sess_data, &logger);
+    let downloader = Downloader::new(&logger, &crawler);
 
     let mut failed_ids = Vec::new();
 
     for video_id in args.video_ids {
-        let video =
-        bilibili::video::Video::fetch_info(video_id.clone(), &crawler, &logger).await?;
-        let selected_quality_index = if args.select_quality {
-            match Select::new()
-                .with_prompt("quality?")
-                .items(&video.get_quality_description())
-                .default(0)
-                .interact()
-            {
-                Ok(index) => index,
-                Err(error) => {
-                    logger.fatal("failed to select the quality");
-                    panic!("{:?}", error)
-                }
-            }
-        } else {
-            video.get_best_quality_index()
-        };
-        let download_result = video
-            .download(selected_quality_index, String::from("download"))
-            .await;
-        if download_result.is_err() {
+        let download_result = downloader.download(&video_id).await;
+        if let Err(e) =  download_result {
+            logger.fatal(&format!("failed to download '{}'", video_id));
+            logger.fatal(&format!("{}", e));
             failed_ids.push(video_id);
         }
     }
 
     if failed_ids.len() > 0 {
-        Err(anyhow::anyhow!("failed to download: {}", failed_ids.join(", ")))
+        Err(anyhow::anyhow!(
+            "failed to download: {}",
+            failed_ids.join(", ")
+        ))
     } else {
         Ok(())
     }
@@ -102,7 +89,7 @@ async fn main_inner() -> Result<()> {
 
 #[tokio::main]
 async fn main() {
-    main_inner().await.expect("视频下载失败");
+    main_inner().await.unwrap();
 }
 
 #[cfg(test)]
