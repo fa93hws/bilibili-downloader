@@ -66,20 +66,23 @@ struct InitialStateVisitor {
 
 impl Visit for InitialStateVisitor {
     fn visit_assign_expr(&mut self, node: &swc_ecma_ast::AssignExpr) {
-        if let AssignTarget::Simple(simple_target) = &node.left {
-            if let SimpleAssignTarget::Member(member_target) = simple_target {
-                if let Expr::Ident(ident) = *member_target.obj.clone() {
-                    if ident.sym.to_string() != "window" {
-                        return;
-                    }
-                    if let MemberProp::Ident(ident) = &member_target.prop {
-                        if ident.sym.to_string() == "__INITIAL_STATE__" {
-                            self.object_span = Some(node.right.span());
-                            return;
-                        }
-                    }
-                }
-            }
+        let AssignTarget::Simple(simple_target) = &node.left else {
+            return;
+        };
+        let SimpleAssignTarget::Member(member_target) = simple_target else {
+            return;
+        };
+        let Expr::Ident(ident) = *member_target.obj.clone() else {
+            return;
+        };
+        if ident.sym.to_string() != "window" {
+            return;
+        }
+        let MemberProp::Ident(ident) = &member_target.prop else {
+            return;
+        };
+        if ident.sym.to_string() == "__INITIAL_STATE__" {
+            self.object_span = Some(node.right.span());
         }
     }
 }
