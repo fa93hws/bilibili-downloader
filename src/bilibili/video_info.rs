@@ -98,23 +98,28 @@ impl VideoInfo {
         self.accept_description[max_idx].clone()
     }
 
-    fn find_best_resource(&self, resources: &[Resource]) -> Resource {
+    fn find_best_resource(&self, resources: &[Resource]) -> (Resource, Resource) {
         let mut max_bandwidth = 0;
         let mut best_resource_idx = 0;
+        let mut second_best_resource_idx = 0;
         for (idx, resource) in resources.iter().enumerate() {
             if resource.bandwidth > max_bandwidth {
+                second_best_resource_idx = best_resource_idx;
                 max_bandwidth = resource.bandwidth;
                 best_resource_idx = idx;
             }
         }
-        resources[best_resource_idx].clone()
+        (
+            resources[best_resource_idx].clone(),
+            resources[second_best_resource_idx].clone(),
+        )
     }
 
     pub fn get_best_audio(&self) -> Resource {
-        self.find_best_resource(&self.audio)
+        self.find_best_resource(&self.audio).0
     }
 
     pub fn get_best_video(&self) -> Resource {
-        self.find_best_resource(&self.video)
+        self.find_best_resource(&self.video).1
     }
 }
