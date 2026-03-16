@@ -70,7 +70,7 @@ async fn main_inner() -> Result<()> {
 
     for video_id in args.video_ids {
         let download_result = downloader.download(&video_id).await;
-        if let Err(e) =  download_result {
+        if let Err(e) = download_result {
             logger.fatal(&format!("failed to download '{}'", video_id));
             logger.fatal(&format!("{}", e));
             failed_ids.push(video_id);

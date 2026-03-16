@@ -1,18 +1,18 @@
 use std::fmt::Debug;
 
+use anyhow::{anyhow, Result};
+use scraper::{Html, Selector};
+use serde::{Deserialize, Serialize};
 use swc_common::source_map::SmallPos;
 use swc_common::sync::Lrc;
-use swc_common::{Span, Spanned};
 use swc_common::{
     errors::{ColorConfig, Handler},
     FileName, SourceMap,
 };
+use swc_common::{Span, Spanned};
 use swc_ecma_ast::{AssignTarget, Expr, MemberProp, Module, SimpleAssignTarget};
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 use swc_ecmascript::visit::{Visit, VisitWith};
-use anyhow::{anyhow, Result};
-use scraper::{Html, Selector};
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct VideoDataSpec {
@@ -33,12 +33,10 @@ pub struct InitialState {
 
 fn parse_js(content: &str) -> Result<Module> {
     let cm: Lrc<SourceMap> = Default::default();
-    let handler =
-        Handler::with_tty_emitter(ColorConfig::Auto, true, false,
-        Some(cm.clone()));
+    let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
     let fm = cm.new_source_file(
-            FileName::Custom("not_matter.js".into()).into(),
-            content.into(),
+        FileName::Custom("not_matter.js".into()).into(),
+        content.into(),
     );
     let lexer = Lexer::new(
         Syntax::Es(Default::default()),
@@ -88,9 +86,7 @@ impl Visit for InitialStateVisitor {
 }
 
 fn initial_state_visitor() -> InitialStateVisitor {
-    InitialStateVisitor {
-        object_span: None,
-    }
+    InitialStateVisitor { object_span: None }
 }
 
 fn try_extract_from_code(ast: &Module, content: &str) -> Option<String> {
@@ -106,7 +102,8 @@ fn try_extract_from_code(ast: &Module, content: &str) -> Option<String> {
 }
 
 pub fn extract_initial_state(document: &Html) -> Result<InitialState> {
-    let script_selector = Selector::parse(r#"script:not([type*=json])"#).expect("failed to parse selector");
+    let script_selector =
+        Selector::parse(r#"script:not([type*=json])"#).expect("failed to parse selector");
     for script_element in document.select(&script_selector) {
         let script_content = script_element.text().collect::<Vec<_>>().join("");
         let ast = parse_js(&script_content)?;

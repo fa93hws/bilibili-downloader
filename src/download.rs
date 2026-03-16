@@ -29,7 +29,6 @@ impl<'a, F: Fetching> Downloader<'a, F> {
         let url = format!("https://www.bilibili.com/video/{video_id}/");
         let bytes = self.crawler.fetch_body(&url).await?;
         let str = std::str::from_utf8(&bytes)?;
-        println!(str);
         Ok(Html::parse_document(str))
     }
 
